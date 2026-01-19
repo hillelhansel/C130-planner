@@ -1,6 +1,7 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 
+# --- ניהול צי (Fleet) ---
 @dataclass
 class ConfigItem:
     category: str
@@ -38,7 +39,6 @@ class AircraftData:
 
     @property
     def total_removed_moment(self):
-        # מומנט חלקי (חלקי 1000)
         m = 0
         for item in self.config_items:
             w_removed = (item.full_qty - item.qty_in_plane) * item.weight_per_unit
@@ -59,17 +59,46 @@ class AircraftData:
 
     @property
     def basic_moment_raw(self):
-        # חישוב המומנט המלא (לא מחולק ב-1000) עבור המערכת הלוגית
-        # אנו מניחים שהמומנטים השמורים (weighing/removed/updates) הם בערכי "Index" (חלקי 1000)
-        # ולכן מכפילים ב-1000 כדי לקבל Moment Raw
-        
         base_m = self.weighing_moment * 1000
         rem_m = self.total_removed_moment * 1000
         upd_m = self.total_updates_moment * 1000
-        
         return base_m - rem_m + upd_m
 
     @property
     def basic_arm_calc(self):
         if self.basic_weight == 0: return 0
         return self.basic_moment_raw / self.basic_weight
+
+# --- תכנון משימה (Mission) ---
+# אלו המחלקות שהיו חסרות וגרמו לקריסה
+
+@dataclass
+class CrewMember:
+    name: str
+    weight: float
+    station: float
+    count: int = 1
+    fixed: bool = False # נדרש עבור פאנל הצוות
+    
+    @property
+    def ls(self):
+        return self.station
+
+@dataclass
+class CargoItem:
+    name: str
+    weight: float
+    station: float
+    # שדות נוספים שנדרשים על ידי cargo.py
+    length: float = 0.0
+    width: float = 0.0
+    type_code: str = "Gen"
+    ref_point: str = "Center"
+    
+    # שדות פנימיים לחישובים ותצוגה
+    ls: float = field(default=0.0) 
+    y_offset: float = 0.0
+    
+    @property
+    def moment(self):
+        return self.weight * self.station

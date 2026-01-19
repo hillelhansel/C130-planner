@@ -9,13 +9,12 @@ class MissionView(ctk.CTkFrame):
     def __init__(self, parent, on_back=None, mgr=None, tail_num="661"):
         super().__init__(parent, fg_color="transparent")
         
-        # טעינת נתונים
+        # סנכרון נתונים
         db = DataManager()
         aircraft_data = db.get_aircraft_data(tail_num)
         
         self.mgr = mgr if mgr else MissionStateManager(tail_number=tail_num)
         
-        # עדכון משקל בסיס ומומנט
         if hasattr(self.mgr, 'logic'):
             self.mgr.logic.basic_weight = aircraft_data.basic_weight
             self.mgr.logic.basic_moment = aircraft_data.basic_moment_raw
@@ -23,21 +22,17 @@ class MissionView(ctk.CTkFrame):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
-        # כפתור חזרה (חשוב!)
         if on_back:
             back_btn = ctk.CTkButton(self, text="<< חזרה לתפריט", command=on_back, 
                                      width=120, height=30, fg_color="#444444", hover_color="#666666")
             back_btn.grid(row=0, column=0, sticky="nw", padx=10, pady=(10, 0))
 
-        # תפריטים
         self.control_panel = ControlPanel(self, self.mgr, self.refresh_all)
         self.control_panel.grid(row=1, column=0, rowspan=2, sticky="nswe", pady=(5, 0))
 
-        # צד ימין
         self.right_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.right_frame.grid(row=1, column=1, rowspan=2, sticky="nswe", padx=5, pady=5)
         
-        # סרגל לגים
         self.plan_bar = ctk.CTkFrame(self.right_frame, fg_color="#2b2b2b", height=40)
         self.plan_bar.pack(fill="x", pady=(0, 5))
         
@@ -48,7 +43,6 @@ class MissionView(ctk.CTkFrame):
         ctk.CTkButton(self.plan_bar, text="Rename", width=60, fg_color="#555555", command=self.popup_rename).pack(side="left", padx=5)
         ctk.CTkButton(self.plan_bar, text="+ New Leg", width=80, fg_color="green", command=self.popup_add_plan).pack(side="right", padx=10)
 
-        # אזור תצוגה
         self.plane_view = ctk.CTkFrame(self.right_frame, fg_color="transparent")
         self.plane_view.pack(fill="both", expand=True)
         

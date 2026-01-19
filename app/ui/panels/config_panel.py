@@ -1,6 +1,6 @@
 import customtkinter as ctk
 from app.ui.panels.base import BaseSection
-from app.data import DataManager, DEFAULT_ITEMS # השימוש בשם הישן עכשיו יעבוד בזכות התיקון למעלה
+from app.data import DataManager 
 from app.ui.panels.config_editor import ConfigEditor
 
 class ConfigPanel(BaseSection):
@@ -9,10 +9,8 @@ class ConfigPanel(BaseSection):
         self.db = DataManager()
         
         self.add_header_button("Quick Edit", self.open_editor, fg_color="#D9534F")
-        
         self.grid_frame = ctk.CTkFrame(self.content_frame, fg_color="transparent")
         self.grid_frame.pack(fill="x", pady=5)
-        
         self.refresh()
 
     def refresh(self):
@@ -28,20 +26,13 @@ class ConfigPanel(BaseSection):
         row = 1
         total_weight = 0
         
-        # לולאה מעודכנת שעובדת עם אובייקטים
+        # גישה לאובייקטים (לא מילונים)
         for item in aircraft_data.config_items:
             if item.qty_in_plane > 0:
                 w_total = item.qty_in_plane * item.weight_per_unit
                 total_weight += w_total
                 
-                vals = [
-                    item.name,
-                    f"{item.weight_per_unit:.1f}",
-                    str(item.qty_in_plane),
-                    f"{w_total:.1f}",
-                    f"{item.ls:.1f}"
-                ]
-                
+                vals = [item.name, f"{item.weight_per_unit:.1f}", str(item.qty_in_plane), f"{w_total:.1f}", f"{item.ls:.1f}"]
                 for i, v in enumerate(vals):
                     ctk.CTkLabel(self.grid_frame, text=v, font=("Arial", 12)).grid(row=row, column=i, sticky="ew", padx=2, pady=1)
                 row += 1

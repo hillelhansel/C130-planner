@@ -1,28 +1,8 @@
 from dataclasses import dataclass, field
 from typing import List, Dict
 from app import config
-
-# --- מחלקות נתונים ---
-@dataclass
-class CrewMember:
-    name: str
-    weight: float
-    station: float
-    count: int = 1
-    
-    @property
-    def ls(self):
-        return self.station
-
-@dataclass
-class CargoItem:
-    name: str
-    weight: float
-    station: float
-    
-    @property
-    def moment(self):
-        return self.weight * self.station
+# ייבוא המחלקות מקובץ המודלים המרכזי
+from app.models import CrewMember, CargoItem 
 
 @dataclass
 class PlanState:
@@ -31,7 +11,6 @@ class PlanState:
     crew: List[CrewMember] = field(default_factory=list)
     payload: List[CargoItem] = field(default_factory=list)
 
-# --- מחשבון עזר ---
 class Calculator:
     @staticmethod
     def distribute_fuel(total_fuel):
@@ -61,36 +40,46 @@ class Calculator:
             return table[-1][1]
         return 0
 
-# --- לוגיקה ראשית ---
 class MissionLogic:
     def __init__(self, basic_weight, basic_moment):
         self.basic_weight = basic_weight
         self.basic_moment = basic_moment
         self.fuel = 0.0
-        self.crew = []
-        self.payload = []
+        self.crew: List[CrewMember] = []
+        self.payload: List[CargoItem] = []
 
     def load_state(self, plan: PlanState):
         self.fuel = plan.fuel
-        self.crew = [CrewMember(c.name, c.weight, c.station, c.count) for c in plan.crew]
-        self.payload = [CargoItem(p.name, p.weight, p.station) for p in plan.payload]
+        # העתקה עמוקה של הרשימות
+        self.crew = [CrewMember(c.name, c.weight, c.station, c.count, c.fixed) for c in plan.crew]
+        self.payload = [
+            CargoItem(p.name, p.weight, p.station, p.length, p.width, p.type_code, p.ref_point, p.ls, p.y_offset) 
+            for p in plan.payload
+        ]
 
     def set_fuel(self, weight):
         self.fuel = weight
 
-    def add_crew(self, name, weight, station):
-        self.crew.append(CrewMember(name, weight, station))
+    def add_crew(self, name, weight, station, count=1):
+        self.crew.append(CrewMember(name, weight, station, count))
 
     def remove_crew(self, idx):
         if 0 <= idx < len(self.crew):
             self.crew.pop(idx)
 
-    def add_payload(self, name, weight, station):
+    def add_payload(self, item: CargoItem):
+        # cargo.py שולח אובייקט CargoItem מוכן
+        self.payload.append(item)
+
+    # פונקציות תמיכה נוספות למקרה שצריך להוסיף ידנית
+    def add_payload_manual(self, name, weight, station):
         self.payload.append(CargoItem(name, weight, station))
 
     def update_payload(self, idx, name, weight, station):
         if 0 <= idx < len(self.payload):
-            self.payload[idx] = CargoItem(name, weight, station)
+            self.payload[idx].name = name
+            self.payload[idx].weight = weight
+            self.payload[idx].station = station
 
     def remove_payload(self, idx):
         if 0 <= idx < len(self.payload):

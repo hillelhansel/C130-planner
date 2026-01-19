@@ -1,8 +1,7 @@
-# app/ui/panels/container.py
 import customtkinter as ctk
 from .base import EditorPanel
 from .header import HeaderSection
-from .config_panel import ConfigurationSection # New Import
+from .config_panel import ConfigPanel # <--- התיקון: שימוש בשם הנכון
 from .basic import BasicWeightSection
 from .crew import CrewSection
 from .fuel import FuelSection
@@ -18,11 +17,11 @@ class ControlPanel(ctk.CTkScrollableFrame):
         self.editor = EditorPanel(self, self.mgr, self.close_editor)
         self.header = HeaderSection(self, self.mgr)
         
-        # New Section inserted here
-        self.config_sec = ConfigurationSection(self, self.mgr)
+        # <--- התיקון: יצירת הפאנל עם השם הנכון והעברת self.refresh
+        self.config_sec = ConfigPanel(self, self.mgr, self.refresh)
         
         self.basic = BasicWeightSection(self, self.mgr)
-        self.basic_frame = self.basic.section # Anchor for editor
+        self.basic_frame = self.basic.section 
         
         self.crew = CrewSection(self, self.mgr)
         self.fuel = FuelSection(self, self.mgr)
@@ -43,9 +42,11 @@ class ControlPanel(ctk.CTkScrollableFrame):
         self.manifest.render()
     
     def update_displays(self, removals_w, fak_w):
-        # רענון טבלת הקונפיגורציה במקרה של החלפת לג
+        # רענון טבלת הקונפיגורציה
         self.config_sec.refresh()
         
-        # פונקציות אלו נשארו לתמיכה, אך המשקל שלהן כרגע מחושב אחרת
-        self.basic.update_display(0)
-        self.crew.update_display(0)
+        # עדכון שאר הפאנלים (עם בדיקה למניעת שגיאות)
+        if hasattr(self.basic, 'update_display'):
+            self.basic.update_display(0)
+        if hasattr(self.crew, 'update_display'):
+            self.crew.update_display(0)
