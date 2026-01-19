@@ -3,45 +3,52 @@ from app.state import MissionStateManager
 from app.ui.panels.container import ControlPanel 
 from app.ui.diagram import AircraftDiagram
 from app.ui.charts import ChartsView
+from app.data import DataManager
 
 class MissionView(ctk.CTkFrame):
-    def __init__(self, parent, mgr=None, tail_num="661"):
+    def __init__(self, parent, on_back=None, mgr=None, tail_num="661"):
         super().__init__(parent, fg_color="transparent")
         
-        # 1. יצירת מנהל המשימה (טוען את הדאטה בייס ואת התצורה של המטוס)
-        self.mgr = mgr if mgr else MissionStateManager(tail_number=tail_num)
+        # אתחול המנג'ר עם מספר זנב ברירת מחדל
+        if mgr:
+            self.mgr = mgr
+        else:
+            # כאן התיקון הקריטי: יצירת מנג'ר חדש שטוען אוטומטית מהדאטה
+            self.mgr = MissionStateManager(tail_number=tail_num)
         
-        # Layout Config
+        # הגדרת Grid
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
-        # 2. Control Panel (צד שמאל - תפריטים)
-        # שינוי: הוספנו כאן את פאנל התצורה החדש בתוך container.py
-        self.control_panel = ControlPanel(self, self.mgr, self.refresh_all)
-        self.control_panel.grid(row=0, column=0, rowspan=2, sticky="nswe")
+        # כפתור חזרה
+        if on_back:
+            back_btn = ctk.CTkButton(self, text="<< חזרה לתפריט", command=on_back, 
+                                     width=120, height=30, fg_color="#444444", hover_color="#666666")
+            back_btn.grid(row=0, column=0, sticky="nw", padx=10, pady=(10, 0))
 
-        # 3. Content Area (צד ימין - דיאגרמה וגרפים)
+        # פאנל שליטה (שמאל)
+        self.control_panel = ControlPanel(self, self.mgr, self.refresh_all)
+        self.control_panel.grid(row=1, column=0, rowspan=2, sticky="nswe", pady=(5, 0))
+
+        # צד ימין (דיאגרמה וגרפים)
         self.right_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.right_frame.grid(row=0, column=1, rowspan=2, sticky="nswe", padx=5, pady=5)
+        self.right_frame.grid(row=1, column=1, rowspan=2, sticky="nswe", padx=5, pady=5)
         
-        # --- Plan Management Bar (סרגל ניהול לגים) ---
+        # סרגל לגים
         self.plan_bar = ctk.CTkFrame(self.right_frame, fg_color="#2b2b2b", height=40)
         self.plan_bar.pack(fill="x", pady=(0, 5))
         
         ctk.CTkLabel(self.plan_bar, text="Active Leg:", font=("Arial", 12, "bold")).pack(side="left", padx=10)
-        
-        # תפריט בחירת לג (Plan A, Plan B...)
         self.plan_selector = ctk.CTkOptionMenu(self.plan_bar, values=[], command=self.on_switch_plan, width=150)
         self.plan_selector.pack(side="left", padx=5)
         
         ctk.CTkButton(self.plan_bar, text="Rename", width=60, fg_color="#555555", command=self.popup_rename).pack(side="left", padx=5)
         ctk.CTkButton(self.plan_bar, text="+ New Leg", width=80, fg_color="green", command=self.popup_add_plan).pack(side="right", padx=10)
 
-        # Plane View Container
+        # תצוגת מטוס וגרפים
         self.plane_view = ctk.CTkFrame(self.right_frame, fg_color="transparent")
         self.plane_view.pack(fill="both", expand=True)
         
-        # Diagram (Top)
         self.top_area = ctk.CTkFrame(self.plane_view, fg_color="transparent")
         self.top_area.pack(side="top", fill="both", expand=True)
         
@@ -53,19 +60,17 @@ class MissionView(ctk.CTkFrame):
                                        self.mgr.notify)
         self.diagram.pack(fill="both", expand=True)
 
-        # Charts (Bottom)
         self.bottom_area = ctk.CTkFrame(self.plane_view, height=280, fg_color="#2b2b2b")
         self.bottom_area.pack(side="bottom", fill="x", pady=5)
         self.bottom_area.pack_propagate(False)
         self.charts = ChartsView(self.bottom_area)
         self.charts.pack(fill="both", expand=True)
 
-        # אתחול נתונים
+        # הפעלה ראשונית
         self.update_plan_selector()
         self.mgr.subscribe(self.on_data_update)
         self.mgr.notify()
 
-    # --- פונקציות ניהול לגים ---
     def update_plan_selector(self):
         names = self.mgr.get_plan_names()
         self.plan_selector.configure(values=names)
@@ -76,12 +81,11 @@ class MissionView(ctk.CTkFrame):
         if choice in names:
             idx = names.index(choice)
             self.mgr.set_active_plan(idx)
-            # עדכון השדות בפאנל השליטה (כולל רענון טבלת הקונפיגורציה)
             self.control_panel.header.em.delete(0, "end")
             self.control_panel.header.em.insert(0, choice)
             self.control_panel.fuel.update_ui()
             self.control_panel.crew.render_list()
-            self.control_panel.config_sec.refresh() # רענון טבלת הגילוח
+            self.control_panel.config_sec.refresh() 
 
     def popup_add_plan(self):
         dialog = ctk.CTkInputDialog(text="Enter Name for New Plan/Leg:", title="New Plan")
@@ -97,15 +101,9 @@ class MissionView(ctk.CTkFrame):
             self.mgr.rename_active_plan(new_name)
             self.update_plan_selector()
 
-    # --- עדכון תצוגה כללי ---
     def on_data_update(self, mgr, data):
         self.control_panel.render_manifest()
-        
-        # עדכון פאנלים
-        # שים לב: פאנל הקונפיג (גילוח) כבר לא מחושב כאן כמשקל חיצוני, אלא מחושב בתוך ה-Logic
-        # לכן אנחנו מעבירים 0 רק כדי לעדכן תצוגות אחרות אם צריך
         self.control_panel.update_displays(0, 0) 
-
         txt = f"BASIC: {int(data['basic_w']):,} | OP: {int(data['op_w']):,} | ZFW: {int(data['zfw']):,} | GW: {int(data['gw']):,} | CG: {data['cg']:.1f} | MAC: {data['mac']:.1f}%"
         self.lbl_status.configure(text=txt)
         self.charts.update_data(data['gw'], data['zfw'], data['fuel_w'], data['mac'])

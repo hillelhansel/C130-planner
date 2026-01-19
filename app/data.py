@@ -5,7 +5,7 @@ from app import config
 DATA_FILE = "planner_data.json"
 TAIL_NUMBERS = ["661", "662", "663", "665", "667", "668", "669"]
 
-# === רשימת פריטים (ברירת מחדל: המטוס מלא) ===
+# === רשימת פריטים (ברירת מחדל) ===
 DEFAULT_CONFIG_ITEMS = [
     {"category": "מושבים/אלונקות", "name": "מושב זוגי", "weight_per_unit": 9.0, "full_qty": 60, "qty_in_plane": 60, "ls": 681.0},
     {"category": "מושבים/אלונקות", "name": "מושב בודד", "weight_per_unit": 5.3, "full_qty": 8, "qty_in_plane": 8, "ls": 681.0},
@@ -72,7 +72,8 @@ def get_default_data():
         }
     return {
         "catalog": config.CATALOG_ITEMS,
-        "fleet": fleet_data
+        "fleet": fleet_data,
+        "aircrafts": {} # תאימות לאחור ל-Planner הישן
     }
 
 class DataManager:
@@ -87,7 +88,11 @@ class DataManager:
         if os.path.exists(DATA_FILE):
             try:
                 with open(DATA_FILE, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    # וידוא שיש את כל המפתחות הדרושים
+                    if "fleet" not in data: data["fleet"] = get_default_data()["fleet"]
+                    if "catalog" not in data: data["catalog"] = config.CATALOG_ITEMS
+                    return data
             except: return get_default_data()
         return get_default_data()
 
@@ -99,14 +104,13 @@ class DataManager:
         return TAIL_NUMBERS
 
     def get_component_names(self):
-        # מחזיר שמות רכיבים מתוך רשימת ברירת המחדל
         return sorted(list(set([item["name"] for item in DEFAULT_CONFIG_ITEMS])))
 
+    # === פונקציות עבור Fleet Manager ===
     def get_aircraft_data(self, tail):
         raw = self.data["fleet"].get(tail, {})
         if not raw: 
             self.data["fleet"][tail] = get_default_data()["fleet"]["661"]
-            self.data["fleet"][tail]["config"] = DEFAULT_CONFIG_ITEMS
             self.save_data()
             raw = self.data["fleet"][tail]
         
@@ -151,3 +155,7 @@ class DataManager:
             "updates": update_list
         }
         self.save_data()
+
+    # === פונקציות תאימות ל-Mission Planner הישן ===
+    def get_catalog(self):
+        return self.data.get("catalog", [])
