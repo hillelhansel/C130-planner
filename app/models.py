@@ -38,6 +38,7 @@ class AircraftData:
 
     @property
     def total_removed_moment(self):
+        # מומנט חלקי (חלקי 1000)
         m = 0
         for item in self.config_items:
             w_removed = (item.full_qty - item.qty_in_plane) * item.weight_per_unit
@@ -58,12 +59,10 @@ class AircraftData:
 
     @property
     def basic_moment_raw(self):
-        # מומנט בסיס *מלא* (לא מחולק ב-1000) לחישובי פלאנר
-        # המומנטים השמורים אצלנו (removed/updates) הם לפעמים ב-in-lbs/1000 ולפעמים לא.
-        # בוא נניח שהכל נשמר ב-Fleet Manager כבר מחולק ב-1000 או לא, 
-        # כאן אנחנו מחזירים ערך *מלא* (Moment Raw)
+        # חישוב המומנט המלא (לא מחולק ב-1000) עבור המערכת הלוגית
+        # אנו מניחים שהמומנטים השמורים (weighing/removed/updates) הם בערכי "Index" (חלקי 1000)
+        # ולכן מכפילים ב-1000 כדי לקבל Moment Raw
         
-        # המומנט מהשקילה הוא בדרך כלל ב-1000? בוא נניח שכן לפי ה-Fleet UI
         base_m = self.weighing_moment * 1000
         rem_m = self.total_removed_moment * 1000
         upd_m = self.total_updates_moment * 1000

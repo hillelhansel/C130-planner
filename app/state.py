@@ -7,15 +7,17 @@ class MissionStateManager:
         self.tail_number = tail_number
         self.observers = []
         
-        # טעינת נתונים ראשוניים מה-Fleet Manager החדש
+        # --- התיקון הקריטי ---
+        # שליפת נתוני המטוס כ-Object מה-DataManager החדש
         aircraft_data = self.db.get_aircraft_data(tail_number)
-        basic_weight = aircraft_data.basic_weight
-        basic_moment = aircraft_data.basic_moment_raw # או aircraft_data.basic_moment
         
-        # יצירת לוגיקה עם הנתונים האמיתיים
+        # שימוש ב-Properties של המודל לחישוב נכון
+        basic_weight = aircraft_data.basic_weight
+        basic_moment = aircraft_data.basic_moment_raw # מומנט מלא לחישובים
+        
+        # אתחול הלוגיקה עם הנתונים האמיתיים
         self.logic = MissionLogic(basic_weight, basic_moment)
         
-        # יצירת תוכנית ראשונית
         self.plans = [PlanState("Plan A")]
         self.active_plan_index = 0
 
@@ -29,13 +31,11 @@ class MissionStateManager:
     def set_active_plan(self, index):
         if 0 <= index < len(self.plans):
             self.active_plan_index = index
-            # טעינת נתוני התוכנית לתוך הלוגיקה
             self.logic.load_state(self.active_plan)
             self.notify()
 
     def add_plan(self, name):
         new_plan = PlanState(name)
-        # העתקת מצב נוכחי לתוכנית החדשה
         new_plan.fuel = self.logic.fuel
         new_plan.crew = list(self.logic.crew)
         new_plan.payload = list(self.logic.payload)
@@ -46,7 +46,7 @@ class MissionStateManager:
         self.active_plan.name = new_name
         self.notify()
 
-    # --- עדכונים ---
+    # Methods delegated to logic
     def update_fuel(self, weight):
         self.logic.set_fuel(weight)
         self.active_plan.fuel = weight
@@ -77,7 +77,7 @@ class MissionStateManager:
         self.active_plan.payload = list(self.logic.payload)
         self.notify()
 
-    # --- Observer Pattern ---
+    # Observer pattern
     def subscribe(self, callback):
         self.observers.append(callback)
 

@@ -1,11 +1,12 @@
 import json
 import os
 from app import config
+from app.models import AircraftData, ConfigItem, UpdateItem
 
 DATA_FILE = "planner_data.json"
 TAIL_NUMBERS = ["661", "662", "663", "665", "667", "668", "669"]
 
-# === רשימת פריטים (ברירת מחדל) ===
+# === רשימת פריטים מלאה (לא מקוצרת) ===
 DEFAULT_CONFIG_ITEMS = [
     {"category": "מושבים/אלונקות", "name": "מושב זוגי", "weight_per_unit": 9.0, "full_qty": 60, "qty_in_plane": 60, "ls": 681.0},
     {"category": "מושבים/אלונקות", "name": "מושב בודד", "weight_per_unit": 5.3, "full_qty": 8, "qty_in_plane": 8, "ls": 681.0},
@@ -72,8 +73,7 @@ def get_default_data():
         }
     return {
         "catalog": config.CATALOG_ITEMS,
-        "fleet": fleet_data,
-        "aircrafts": {} # תאימות לאחור ל-Planner הישן
+        "fleet": fleet_data
     }
 
 class DataManager:
@@ -89,7 +89,6 @@ class DataManager:
             try:
                 with open(DATA_FILE, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    # וידוא שיש את כל המפתחות הדרושים
                     if "fleet" not in data: data["fleet"] = get_default_data()["fleet"]
                     if "catalog" not in data: data["catalog"] = config.CATALOG_ITEMS
                     return data
@@ -105,8 +104,10 @@ class DataManager:
 
     def get_component_names(self):
         return sorted(list(set([item["name"] for item in DEFAULT_CONFIG_ITEMS])))
+        
+    def get_catalog(self):
+        return self.data.get("catalog", [])
 
-    # === פונקציות עבור Fleet Manager ===
     def get_aircraft_data(self, tail):
         raw = self.data["fleet"].get(tail, {})
         if not raw: 
@@ -119,7 +120,14 @@ class DataManager:
         w = raw.get("weighing", {})
         h = raw.get("header", {})
         
-        c_items = [ConfigItem(**i) for i in raw.get("config", [])]
+        # המרת מילונים לאובייקטים
+        # שימוש ברשימה המלאה והמעודכנת מהקובץ או מברירת המחדל אם חסר
+        raw_config = raw.get("config", [])
+        if not raw_config:
+             # אם זה מטוס חדש שנוצר עכשיו, תן לו את רשימת ברירת המחדל המלאה
+             raw_config = DEFAULT_CONFIG_ITEMS
+
+        c_items = [ConfigItem(**i) for i in raw_config]
         u_items = [UpdateItem(
             date=i["date"], adjuster=i["adjuster"], description=i["description"],
             weight_change=i["weight"], arm_change=i["arm"], moment_change=i["moment"]
@@ -155,7 +163,3 @@ class DataManager:
             "updates": update_list
         }
         self.save_data()
-
-    # === פונקציות תאימות ל-Mission Planner הישן ===
-    def get_catalog(self):
-        return self.data.get("catalog", [])
