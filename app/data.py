@@ -6,7 +6,7 @@ from app.models import AircraftData, ConfigItem, UpdateItem
 DATA_FILE = "planner_data.json"
 TAIL_NUMBERS = ["661", "662", "663", "665", "667", "668", "669"]
 
-# === רשימת פריטים מלאה (לא מקוצרת) ===
+# === רשימת פריטי תצורה (השם החדש) ===
 DEFAULT_CONFIG_ITEMS = [
     {"category": "מושבים/אלונקות", "name": "מושב זוגי", "weight_per_unit": 9.0, "full_qty": 60, "qty_in_plane": 60, "ls": 681.0},
     {"category": "מושבים/אלונקות", "name": "מושב בודד", "weight_per_unit": 5.3, "full_qty": 8, "qty_in_plane": 8, "ls": 681.0},
@@ -62,6 +62,10 @@ DEFAULT_CONFIG_ITEMS = [
     {"category": "ציוד כללי", "name": "סולם גפ\"ט", "weight_per_unit": 43.0, "full_qty": 1, "qty_in_plane": 1, "ls": 360.0}
 ]
 
+# >>> התיקון הקריטי: שורת הגישור <<<
+# שורה זו אומרת לקוד הישן: "אם אתה מחפש DEFAULT_ITEMS, תשתמש ב-DEFAULT_CONFIG_ITEMS"
+DEFAULT_ITEMS = DEFAULT_CONFIG_ITEMS 
+
 def get_default_data():
     fleet_data = {}
     for tail in TAIL_NUMBERS:
@@ -115,16 +119,9 @@ class DataManager:
             self.save_data()
             raw = self.data["fleet"][tail]
         
-        from app.models import AircraftData, ConfigItem, UpdateItem
-        
-        w = raw.get("weighing", {})
-        h = raw.get("header", {})
-        
-        # המרת מילונים לאובייקטים
-        # שימוש ברשימה המלאה והמעודכנת מהקובץ או מברירת המחדל אם חסר
+        # תמיכה במטוסים ישנים שחסר להם שדה config
         raw_config = raw.get("config", [])
         if not raw_config:
-             # אם זה מטוס חדש שנוצר עכשיו, תן לו את רשימת ברירת המחדל המלאה
              raw_config = DEFAULT_CONFIG_ITEMS
 
         c_items = [ConfigItem(**i) for i in raw_config]

@@ -1,86 +1,55 @@
-# app/ui/panels/config_editor.py
 import customtkinter as ctk
+from app.data import DataManager, DEFAULT_ITEMS
 
-class ConfigEditorPanel(ctk.CTkFrame):
-    def __init__(self, parent, config_list, on_change_callback, is_editable=True):
-        super().__init__(parent, fg_color="#2b2b2b")
-        self.config_list = config_list
-        self.on_change = on_change_callback
-        self.is_editable = is_editable
-
-        # Headers
-        headers = ctk.CTkFrame(self, fg_color="#444444", height=30)
-        headers.pack(fill="x", padx=2, pady=2)
+class ConfigEditor(ctk.CTkToplevel):
+    def __init__(self, parent, mgr, close_cb):
+        super().__init__(parent)
+        self.mgr = mgr
+        self.close_cb = close_cb
+        self.db = DataManager()
+        self.title("עריכת תצורה מהירה")
+        self.geometry("600x500")
         
-        # עמודות בטבלה
-        cols = [("Item Name", 140), ("Wt", 40), ("Arm", 40), ("Qty", 70), ("Total", 50)]
-        for txt, w in cols:
-            ctk.CTkLabel(headers, text=txt, width=w, font=("Arial", 11, "bold")).pack(side="left", padx=1)
-
-        # רשימה נגללת
-        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        self.scroll.pack(fill="both", expand=True)
+        self.tail = self.mgr.tail_number
+        self.ac_data = self.db.get_aircraft_data(self.tail)
+        self.items = self.ac_data.config_items
         
-        self.render_items()
+        ctk.CTkLabel(self, text=f"עריכת תצורה - מטוס {self.tail}", font=("Arial", 18, "bold")).pack(pady=10)
         
-        # שורת סיכום למטה
-        self.footer = ctk.CTkFrame(self, fg_color="#333333", height=35)
-        self.footer.pack(fill="x", pady=5)
-        self.lbl_total = ctk.CTkLabel(self.footer, text="Total: 0", font=("Arial", 12, "bold"), text_color="cyan")
-        self.lbl_total.pack()
-        self.update_totals()
-
-    def render_items(self):
-        # ניקוי ישן
-        for w in self.scroll.winfo_children(): w.destroy()
+        self.scroll = ctk.CTkScrollableFrame(self)
+        self.scroll.pack(fill="both", expand=True, padx=10, pady=5)
         
-        # מיון: קודם פריטי בסיס (Standard), אחר כך Role
-        sorted_list = sorted(self.config_list, key=lambda x: x.category, reverse=True)
+        self.entries = {}
+        
+        for i, item in enumerate(self.items):
+            row = ctk.CTkFrame(self.scroll, fg_color="transparent")
+            row.pack(fill="x", pady=2)
+            
+            ctk.CTkLabel(row, text=item.name, width=200, anchor="w").pack(side="left", padx=5)
+            
+            ctk.CTkButton(row, text="-", width=30, fg_color="#D9534F", command=lambda x=item, idx=i: self.change_qty(idx, -1)).pack(side="right", padx=2)
+            
+            lbl_qty = ctk.CTkLabel(row, text=str(item.qty_in_plane), width=30, font=("Arial", 12, "bold"))
+            lbl_qty.pack(side="right", padx=5)
+            self.entries[i] = lbl_qty
+            
+            ctk.CTkButton(row, text="+", width=30, fg_color="#2CC985", command=lambda x=item, idx=i: self.change_qty(idx, 1)).pack(side="right", padx=2)
+            
+            ctk.CTkLabel(row, text=f"Max: {item.full_qty}", text_color="gray").pack(side="right", padx=10)
 
-        for item in sorted_list:
-            # בחירת צבע רקע לפי סוג (ירוק כהה / אדום כהה)
-            bg_col = "#2A402A" if item.category == "Standard" else "#402A2A"
-            
-            row = ctk.CTkFrame(self.scroll, fg_color=bg_col)
-            row.pack(fill="x", pady=1)
-            
-            ctk.CTkLabel(row, text=item.name, width=140, anchor="w").pack(side="left", padx=5)
-            ctk.CTkLabel(row, text=str(int(item.weight)), width=40).pack(side="left")
-            ctk.CTkLabel(row, text=str(int(item.ls)), width=40).pack(side="left")
-            
-            # שליטה בכמות
-            qty_frame = ctk.CTkFrame(row, fg_color="transparent", width=70)
-            qty_frame.pack(side="left")
-            
-            btn_minus = ctk.CTkButton(qty_frame, text="-", width=22, height=22, fg_color="#555555",
-                                      command=lambda i=item: self.change_qty(i, -1))
-            btn_minus.pack(side="left")
-            
-            lbl_qty = ctk.CTkLabel(qty_frame, text=str(item.qty), width=20, font=("Arial", 12, "bold"))
-            lbl_qty.pack(side="left")
-            
-            btn_plus = ctk.CTkButton(qty_frame, text="+", width=22, height=22, fg_color="#555555",
-                                     command=lambda i=item: self.change_qty(i, 1))
-            btn_plus.pack(side="left")
-            
-            # סך משקל לפריט
-            lbl_tot = ctk.CTkLabel(row, text=str(int(item.total_weight)), width=50)
-            lbl_tot.pack(side="left")
-            
-            # שמירת רפרנסים לעדכון מהיר בלי לצייר הכל מחדש
-            item.ui_lbl_qty = lbl_qty
-            item.ui_lbl_tot = lbl_tot
+        ctk.CTkButton(self, text="שמור וסגור", command=self.save_and_close).pack(pady=10)
 
-    def change_qty(self, item, delta):
-        new_qty = item.qty + delta
-        if 0 <= new_qty <= item.max_qty:
-            item.qty = new_qty
-            # עדכון טקסטים
-            if hasattr(item, 'ui_lbl_qty'): item.ui_lbl_qty.configure(text=str(item.qty))
-            if hasattr(item, 'ui_lbl_tot'): item.ui_lbl_tot.configure(text=str(int(item.total_weight)))
-            self.update_totals()
-            self.on_change() # עדכון למערכת הראשית
+    def change_qty(self, idx, delta):
+        item = self.items[idx]
+        new_qty = item.qty_in_plane + delta
+        if 0 <= new_qty <= item.full_qty:
+            item.qty_in_plane = new_qty
+            self.entries[idx].configure(text=str(new_qty))
 
-    def update_totals(self):
-        total_w = sum(i.total_weight for i in self.config_list)
-        self.lbl_total.configure(text=f"Total Config Wt: {int(total_w):,} Lbs")
+    def save_and_close(self):
+        self.db.save_aircraft_data(self.ac_data)
+        # עדכון הלוגיקה הראשית כדי ששינויי התצורה ישפיעו על הגרפים מיד
+        self.mgr.logic.basic_weight = self.ac_data.basic_weight
+        self.mgr.logic.basic_moment = self.ac_data.basic_moment_raw
+        self.close_cb()
+        self.destroy()
