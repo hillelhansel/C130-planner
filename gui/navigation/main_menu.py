@@ -14,10 +14,10 @@ class MainMenu(ctk.CTkFrame):
         # כפתורים
         btn_config = {"width": 300, "height": 60, "font": ("Arial", 18)}
         
-        ctk.CTkButton(self.center_box, text="Mission Planner (תכנון משימה)", 
+        ctk.CTkButton(self.center_box, text="Mission Planner", 
                       command=on_planner_click, **btn_config).pack(pady=10)
                       
-        ctk.CTkButton(self.center_box, text="Fleet Manager (ניהול צי)", 
+        ctk.CTkButton(self.center_box, text="Fleet Manager", 
                       command=on_fleet_click, fg_color="#555555", **btn_config).pack(pady=10)
         
         ctk.CTkButton(self.center_box, text="Cargo Database", 
