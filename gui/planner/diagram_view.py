@@ -1,55 +1,99 @@
 import customtkinter as ctk
-from core.fleet_constants import COMPARTMENT_DEFS
+from PIL import Image, ImageTk
+import os
 
 class DiagramView(ctk.CTkFrame):
-    def __init__(self, parent, mgr):
-        super().__init__(parent, fg_color="#1a1a1a", height=220)
-        self.mgr = mgr
-        self.canvas = ctk.CTkCanvas(self, bg="#1a1a1a", highlightthickness=0)
-        self.canvas.pack(fill="both", expand=True, padx=5, pady=5)
-        self.bind("<Configure>", lambda e: self.draw())
+    def __init__(self, parent, manager):
+        super().__init__(parent, fg_color="transparent")
+        self.mgr = manager
+        
+        # כותרת
+        ctk.CTkLabel(self, text="C.G. Envelope Visualization", font=("Arial", 16, "bold")).pack(pady=10)
+        
+        # קנבס לציור
+        self.canvas = ctk.CTkCanvas(self, bg="#222", highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        self.plane_img_ref = None # חובה לשמור רפרנס
+        self.load_image()
+        
+        # האזנה לשינויי גודל
+        self.canvas.bind("<Configure>", self.on_resize)
+
+    def load_image(self):
+        try:
+            # נתיב לקובץ
+            img_path = os.path.join("assets", "plane_bg.png")
+            if os.path.exists(img_path):
+                self.orig_image = Image.open(img_path)
+            else:
+                self.orig_image = None
+                print(f"Error: Image not found at {img_path}")
+        except Exception as e:
+            print(f"Error loading image: {e}")
+            self.orig_image = None
+
+    def on_resize(self, event):
+        self.draw()
+
+    def refresh(self):
+        self.draw()
 
     def draw(self):
         self.canvas.delete("all")
-        w = self.canvas.winfo_width()
-        if w < 100: return 
-        st_start, st_end = 100, 1250 
-        scale = w / (st_end - st_start)
-        def x(st): return (st - st_start) * scale
-        my = self.canvas.winfo_height() / 2
         
-        # Aircraft Body (Detailed)
-        self.canvas.create_line(x(245), my-40, x(1141), my-40, fill="gray", width=2)
-        self.canvas.create_line(x(245), my+40, x(1141), my+40, fill="gray", width=2)
-        self.canvas.create_oval(x(160), my-40, x(290), my+40, outline="gray", width=2) # Nose
-        self.canvas.create_polygon(x(200), my-25, x(245), my-40, x(245), my-20, x(210), my-15, fill="#3B8ED0", outline="gray") # Cockpit
-        self.canvas.create_line(x(1141), my-40, x(1220), my-110, fill="gray", width=2) # Tail
-        self.canvas.create_line(x(1141), my+40, x(1190), my+10, fill="gray", width=2) # Ramp
-        self.canvas.create_line(x(520), my-40, x(580), my-120, fill="#333", width=2) # Wing L
-        self.canvas.create_line(x(680), my-40, x(620), my-120, fill="#333", width=2) # Wing R
+        w = self.canvas.winfo_width()
+        h = self.canvas.winfo_height()
+        
+        if w < 10 or h < 10: return
 
-        # Compartments
-        for n, s, e in COMPARTMENT_DEFS:
-            self.canvas.create_line(x(s), my-38, x(s), my+38, fill="#444", dash=(2,4))
-            self.canvas.create_text(x((s+e)/2), my+55, text=n, fill="gray", font=("Arial", 9))
+        # 1. ציור תמונת המטוס
+        plane_bounds = None
+        
+        if self.orig_image:
+            # חישוב יחס גובה-רוחב כדי לשמור על פרופורציות
+            img_w, img_h = self.orig_image.size
+            ratio = min(w / img_w, h / img_h) * 0.9 # תופס 90% מהשטח
+            
+            new_w = int(img_w * ratio)
+            new_h = int(img_h * ratio)
+            
+            resized = self.orig_image.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            self.plane_img_ref = ImageTk.PhotoImage(resized)
+            
+            cx, cy = w / 2, h / 2
+            self.canvas.create_image(cx, cy, image=self.plane_img_ref)
+            
+            # שמירת גבולות המטוס לטובת חישוב מיקום ה-CG
+            plane_bounds = {
+                'x': cx - new_w/2, 'y': cy - new_h/2,
+                'w': new_w, 'h': new_h
+            }
+        else:
+            self.canvas.create_text(w/2, h/2, text="[Plane Image Missing]", fill="gray")
+            return
 
-        # Payload
-        for item in self.mgr.payload:
-            l = (item.length or 30) / (st_end-st_start) * w
-            wi = ((item.width or 30) / 120) * 80
-            xc, yc = x(item.station), my + (item.y_offset * 0.5)
-            col = "#3B8ED0" if "Pax" in item.type_code else "#E0a800"
-            self.canvas.create_rectangle(xc-l/2, yc-wi/2, xc+l/2, yc+wi/2, fill=col, outline="black")
-            if l > 15: self.canvas.create_text(xc, my, text=item.name[:5], font=("Arial", 8, "bold"))
-
-        # Crew
-        for m in self.mgr.crew:
-            self.canvas.create_oval(x(m.station)-5, my-5, x(m.station)+5, my+5, fill="#5555ff", outline="white")
-
-        # CG
-        cg = self.mgr.calculate_current_state()['cg']
-        if 200 < cg < 1200:
-            self.canvas.create_line(x(cg), my-70, x(cg), my+70, fill="#FF5555", width=2, dash=(6,2))
-            self.canvas.create_text(x(cg), my-85, text=f"CG: {cg:.1f}", fill="#FF5555", font=("Arial", 10, "bold"))
-
-    def update_view(self, data): self.draw()
+        # 2. ציור קו ה-CG
+        res = self.mgr.get_results()
+        cg_percent = res.get("CG", 0)
+        
+        if plane_bounds:
+            px = plane_bounds['x']
+            py = plane_bounds['y']
+            pw = plane_bounds['w']
+            ph = plane_bounds['h']
+            
+            # כיול: נניח שה-MAC מתחיל ב-35% ונגמר ב-65% מאורך המטוס בתמונה
+            # (בפועל תצטרך להתאים את המספרים האלה לתמונה הספציפית שלך)
+            mac_start_x = px + (pw * 0.35)
+            mac_width = pw * 0.30 # אורך ה-MAC בפיקסלים (30% מהמטוס)
+            
+            # חישוב מיקום ה-X של ה-CG
+            # CG הוא באחוזים (למשל 25%), אז נמיר לפיקסלים בתוך ה-MAC
+            cg_x = mac_start_x + (cg_percent / 100.0 * mac_width)
+            
+            # ציור הקו
+            self.canvas.create_line(cg_x, py, cg_x, py + ph, fill="cyan", width=3, dash=(4, 2))
+            
+            # כיתוב
+            self.canvas.create_text(cg_x, py - 15, text=f"CG: {cg_percent:.1f}%", fill="cyan", font=("Arial", 12, "bold"))
