@@ -1,12 +1,32 @@
-import json
-import os
-from core import config
-from core.models import AircraftData, ConfigItem, UpdateItem
+# core/fleet_constants.py
 
-DATA_FILE = "planner_data.json"
-TAIL_NUMBERS = ["661", "662", "663", "665", "667", "668", "669"]
+LEMAC = 687.4
+MAC_LEN = 164.5
+LS_START = 85
+LS_END = 1205
 
-# === רשימת פריטי תצורה ===
+DEFAULT_BASIC_WEIGHT = 91000.0
+DEFAULT_BASIC_ARM = 723.0
+
+FUEL_CAPACITIES = {
+    "External": 17800.0, "Auxiliary": 11620.0,
+    "Outboard": 16620.0, "Inboard": 15320.0
+}
+
+FUEL_TABLE_DATA = {
+    "Auxiliary": [(0, 0), (1000, 762), (5000, 3789), (10000, 7569), (13000, 9840)],
+    "Inboard": [(0, 0), (1000, 760), (5000, 3781), (10000, 7553), (15548, 11739)],
+    "Outboard": [(0, 0), (1000, 750), (5000, 3737), (10000, 7461), (16880, 12579)],
+    "External": [(0, 0), (1000, 752), (5000, 3759), (10000, 7513), (18184, 13659)]
+}
+
+COMPARTMENT_DEFS = [
+    ("C", 345, 383), ("D", 383, 472), ("E", 472, 562), ("F", 562, 652),
+    ("G", 652, 742), ("H", 742, 832), ("I", 832, 922), ("J", 922, 1011),
+    ("K", 1011, 1042), ("L", 1042, 1124), ("M", 1124, 1141)
+]
+
+# הרשימה המלאה שלך
 DEFAULT_CONFIG_ITEMS = [
     {"category": "מושבים/אלונקות", "name": "מושב זוגי", "weight_per_unit": 9.0, "full_qty": 60, "qty_in_plane": 60, "ls": 681.0},
     {"category": "מושבים/אלונקות", "name": "מושב בודד", "weight_per_unit": 5.3, "full_qty": 8, "qty_in_plane": 8, "ls": 681.0},
@@ -61,101 +81,3 @@ DEFAULT_CONFIG_ITEMS = [
     {"category": "ציוד כללי", "name": "ספרות מטוס", "weight_per_unit": 20.0, "full_qty": 1, "qty_in_plane": 1, "ls": 339.0},
     {"category": "ציוד כללי", "name": "סולם גפ\"ט", "weight_per_unit": 43.0, "full_qty": 1, "qty_in_plane": 1, "ls": 360.0}
 ]
-
-# >>> התיקון הקריטי: שורה שמאפשרת לקוד הישן לעבוד <<<
-DEFAULT_ITEMS = DEFAULT_CONFIG_ITEMS 
-
-def get_default_data():
-    fleet_data = {}
-    for tail in TAIL_NUMBERS:
-        fleet_data[tail] = {
-            "weighing": {"weight": 92300.0, "arm": 723.46, "moment": 66775.8},
-            "header": {"index": 1, "date": "", "updater": "", "nature": ""},
-            "config": DEFAULT_CONFIG_ITEMS,
-            "updates": []
-        }
-    return {
-        "catalog": config.CATALOG_ITEMS,
-        "fleet": fleet_data
-    }
-
-class DataManager:
-    _instance = None
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(DataManager, cls).__new__(cls)
-            cls._instance.data = cls._instance.load_data()
-        return cls._instance
-
-    def load_data(self):
-        if os.path.exists(DATA_FILE):
-            try:
-                with open(DATA_FILE, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    if "fleet" not in data: data["fleet"] = get_default_data()["fleet"]
-                    if "catalog" not in data: data["catalog"] = config.CATALOG_ITEMS
-                    return data
-            except: return get_default_data()
-        return get_default_data()
-
-    def save_data(self):
-        with open(DATA_FILE, 'w', encoding='utf-8') as f:
-            json.dump(self.data, f, indent=4, ensure_ascii=False)
-
-    def get_fleet_keys(self): 
-        return TAIL_NUMBERS
-
-    def get_component_names(self):
-        return sorted(list(set([item["name"] for item in DEFAULT_CONFIG_ITEMS])))
-        
-    def get_catalog(self):
-        return self.data.get("catalog", [])
-
-    def get_aircraft_data(self, tail):
-        raw = self.data["fleet"].get(tail, {})
-        if not raw: 
-            self.data["fleet"][tail] = get_default_data()["fleet"]["661"]
-            self.save_data()
-            raw = self.data["fleet"][tail]
-        
-        # המרה חכמה שתומכת בתיקון הישן
-        raw_config = raw.get("config", [])
-        if not raw_config:
-             raw_config = DEFAULT_CONFIG_ITEMS
-
-        c_items = [ConfigItem(**i) for i in raw_config]
-        u_items = [UpdateItem(
-            date=i["date"], adjuster=i["adjuster"], description=i["description"],
-            weight_change=i["weight"], arm_change=i["arm"], moment_change=i["moment"]
-        ) for i in raw.get("updates", [])]
-        
-        return AircraftData(
-            tail_number=tail,
-            weighing_weight=w.get("weight", 92300.0),
-            weighing_arm=w.get("arm", 723.46),
-            weighing_moment=w.get("moment", 66775.8),
-            current_update_index=h.get("index", 1),
-            last_update_date=h.get("date", ""),
-            last_updater_name=h.get("updater", ""),
-            update_nature=h.get("nature", ""),
-            config_items=c_items,
-            update_items=u_items
-        )
-
-    def save_aircraft_data(self, obj):
-        tail = obj.tail_number
-        config_list = [{"category": c.category, "name": c.name, "weight_per_unit": c.weight_per_unit, "full_qty": c.full_qty, "qty_in_plane": c.qty_in_plane, "ls": c.ls} for c in obj.config_items]
-        update_list = [{"date": u.date, "adjuster": u.adjuster, "description": u.description, "weight": u.weight_change, "arm": u.arm_change, "moment": u.moment_change} for u in obj.update_items]
-        
-        self.data["fleet"][tail] = {
-            "weighing": {"weight": obj.weighing_weight, "arm": obj.weighing_arm, "moment": obj.weighing_moment},
-            "header": {
-                "index": obj.current_update_index,
-                "date": obj.last_update_date,
-                "updater": obj.last_updater_name,
-                "nature": obj.update_nature
-            },
-            "config": config_list,
-            "updates": update_list
-        }
-        self.save_data()

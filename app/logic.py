@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from typing import List, Dict
 from app import config
-# ייבוא המחלקות מקובץ המודלים המרכזי
-from app.models import CrewMember, CargoItem 
+# ייבוא המחלקות המרכזיות (חשוב!)
+from core.models import CrewMember, CargoItem 
 
 @dataclass
 class PlanState:
@@ -50,7 +50,7 @@ class MissionLogic:
 
     def load_state(self, plan: PlanState):
         self.fuel = plan.fuel
-        # העתקה עמוקה של הרשימות
+        # שימוש ב-copy או יצירה מחדש כדי למנוע בעיות הפניה
         self.crew = [CrewMember(c.name, c.weight, c.station, c.count, c.fixed) for c in plan.crew]
         self.payload = [
             CargoItem(p.name, p.weight, p.station, p.length, p.width, p.type_code, p.ref_point, p.ls, p.y_offset) 
@@ -61,19 +61,15 @@ class MissionLogic:
         self.fuel = weight
 
     def add_crew(self, name, weight, station, count=1):
-        self.crew.append(CrewMember(name, weight, station, count))
+        # יצירת איש צוות חדש (לא קבוע)
+        self.crew.append(CrewMember(name, weight, station, count, fixed=False))
 
     def remove_crew(self, idx):
         if 0 <= idx < len(self.crew):
             self.crew.pop(idx)
 
     def add_payload(self, item: CargoItem):
-        # cargo.py שולח אובייקט CargoItem מוכן
         self.payload.append(item)
-
-    # פונקציות תמיכה נוספות למקרה שצריך להוסיף ידנית
-    def add_payload_manual(self, name, weight, station):
-        self.payload.append(CargoItem(name, weight, station))
 
     def update_payload(self, idx, name, weight, station):
         if 0 <= idx < len(self.payload):

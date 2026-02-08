@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from .base import BaseSection
 from app import config
-from app.models import CargoItem
+from core.models import CargoItem
 from app.data import DataManager  # חיבור למסד הנתונים
 
 class CargoSection:

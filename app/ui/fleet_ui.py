@@ -2,7 +2,7 @@ import customtkinter as ctk
 import os
 from datetime import datetime
 from app.data import DataManager, TAIL_NUMBERS, DEFAULT_CONFIG_ITEMS
-from app.models import UpdateItem
+from core.models import UpdateItem
 
 # --- Helper ---
 def fix_text(text):
